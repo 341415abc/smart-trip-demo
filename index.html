@@ -458,7 +458,7 @@
             <div class="route-feed-summary" id="route-feed-summary" hidden>
               <details id="route-traffic-details">
                 <summary id="route-traffic-status">即時路況</summary>
-                <p>依官方國道、省道回報與行車方向比對。綠色為順暢、黃橘色為車流較多或壅塞、紅色為嚴重壅塞。藍色為規劃路線。</p>
+                <p>依臺北市、國道與省道的官方回報比對行車方向。綠色為順暢，黃橘色為車流較多或壅塞，紅色為嚴重壅塞，藍色為規劃路線。</p>
                 <p id="route-traffic-info"></p>
                 <p><a href="https://tdx.transportdata.tw/api-service/swagger/basic/7f07d940-91a4-495d-9465-1c9df89d709c" target="_blank" rel="noopener">交通部 TDX 路況</a></p>
               </details>
@@ -1386,17 +1386,17 @@
     })();
     const liveTraffic = (() => {
       const providers = [
-        { key: 'freeway', api: 'Freeway', source: '交通部高速公路局／TDX' },
-        { key: 'highway', api: 'Highway', source: '交通部公路局／TDX' },
+        { key: 'freeway', name: '國道', api: 'Freeway', source: '交通部高速公路局／TDX' },
+        { key: 'highway', name: '省道', api: 'Highway', source: '交通部公路局／TDX' },
+        { key: 'taipei', name: '臺北市', api: 'City/Taipei', source: '臺北市交通管制工程處／TDX' },
       ];
       const base = 'https://tdx.transportdata.tw/api/basic/v2/Road/Traffic/Live/';
       const cacheDuration = 120000;
       const maxSampleAge = 15 * 60000;
       const quotaStorageKey = 'smart-trip-tdx-guest-quota';
       const guestDailyLimit = 20;
+      const providerRequests = new Map();
       let memoryQuota;
-      let cache;
-      let pending;
       let catalogRequest;
 
       function loadCatalog() {
@@ -1463,9 +1463,10 @@
       }
 
       function normalizeFeed(provider, payload, checkedAt, trafficCatalog) {
-        const rows = Array.isArray(payload) ? payload : payload?.LiveTraffics ?? payload?.value;
+        const rows = Array.isArray(payload) ? payload : payload?.LiveTraffics ?? payload?.Items ?? payload?.value;
         if (!Array.isArray(rows)) throw new Error('即時路況回應格式有誤。');
         const catalog = trafficCatalog[provider.key];
+        if (!catalog) throw new Error(`無法載入${provider.name}路段圖資。`);
         const byId = new Map();
         let latest = null;
         for (const row of rows) {
@@ -1491,7 +1492,7 @@
         if (rows.length && !byId.size) throw new Error('即時路況未能對應現有路段圖資。');
         const issuedAt = asTime(payload?.UpdateTime) ?? latest;
         return {
-          key: provider.key, source: provider.source,
+          name: provider.name, source: provider.source,
           issuedAt: issuedAt === null ? null : new Date(issuedAt).toISOString(),
           checkedAt: new Date(checkedAt).toISOString(),
           sections: [...byId.values()].map(({ timestamp, ...section }) => section),
@@ -1519,31 +1520,34 @@
         }
       }
 
-      async function load() {
+      async function loadProvider(provider, catalog) {
         const now = Date.now();
-        if (cache && now < cache.expires) {
-          return {
-            ...cache.data,
-            feeds: cache.data.feeds.map(feed => ({
-              ...feed,
-              sections: feed.sections.map(section =>
-                (section.level !== null || section.speed !== null) && now - Date.parse(section.observedAt) > maxSampleAge
-                  ? { ...section, level: null, speed: null } : section),
-            })),
-          };
+        let entry = providerRequests.get(provider.key);
+        if (!entry || now >= entry.expires) {
+          entry = { expires: Infinity };
+          entry.request = fetchProvider(provider, catalog).finally(() => { entry.expires = Date.now() + cacheDuration; });
+          providerRequests.set(provider.key, entry);
         }
-        if (!pending) {
-          pending = loadCatalog().then(catalog => Promise.allSettled(providers.map(provider => fetchProvider(provider, catalog)))).then(results => {
-            const data = { feeds: [], errors: [] };
-            results.forEach((result, i) => {
-              if (result.status === 'fulfilled') data.feeds.push(result.value);
-              else data.errors.push({ key: providers[i].key, message: result.reason.message });
-            });
-            cache = { data, expires: Date.now() + cacheDuration };
-            return data;
-          }).finally(() => { pending = undefined; });
-        }
-        return pending;
+        const feed = await entry.request;
+        const checkedAt = Date.now();
+        return {
+          ...feed,
+          sections: feed.sections.map(section =>
+            (section.level !== null || section.speed !== null) && checkedAt - Date.parse(section.observedAt) > maxSampleAge
+              ? { ...section, level: null, speed: null } : section),
+        };
+      }
+
+      async function load(includeTaipei) {
+        const selected = providers.filter(provider => includeTaipei || provider.key !== 'taipei');
+        const catalog = await loadCatalog();
+        const results = await Promise.allSettled(selected.map(provider => loadProvider(provider, catalog)));
+        const data = { feeds: [], errors: [] };
+        results.forEach((result, i) => {
+          if (result.status === 'fulfilled') data.feeds.push(result.value);
+          else data.errors.push({ name: selected[i].name, message: result.reason.message });
+        });
+        return data;
       }
 
       return { load };
@@ -1990,12 +1994,14 @@
 
       function cameraPoints(catalog) {
         const matches = [];
-        for (const [source, id, name, lat, lng, prefix, suffix] of catalog.cameras) {
+        for (const [sourceKey, id, name, lat, lng, prefix, suffix] of catalog.cameras) {
           const distance = nearest([lat, lng], cameraRange);
           if (!distance) continue;
+          const source = catalog.sources[sourceKey];
           const url = new URL(catalog.streamPrefixes[prefix] + suffix);
-          if (url.protocol !== 'https:' || !url.hostname.endsWith('.gov.tw')) continue;
-          matches.push({ id, name, lat, lng, url: url.href, source: catalog.sources[source], ...distance });
+          const linkOnly = source?.linkOnly === true;
+          if (!source || url.protocol !== 'https:' || !url.hostname.endsWith('.gov.tw')) continue;
+          matches.push({ id, name, lat, lng, url: url.href, linkOnly, source, ...distance });
         }
         matches.sort((a, b) => a.distance - b.distance);
         return { matches: matches.slice(0, maxCameras).sort((a, b) => a.progress - b.progress), total: matches.length };
@@ -2029,10 +2035,11 @@
           const paths = matchingLines(section.paths);
           if (paths.length) segments.push({ ...section, paths, level, source: group.source });
         }
-        const missing = feed.errors?.map(issue => issue.key === 'freeway' ? '國道' : '省道').join('、');
+        const missing = feed.errors.map(issue => issue.name).join('、');
+        const checked = feed.feeds.map(group => group.name).join('、');
         if (!feed.feeds.length) setInfo('traffic', '資料暫時無法查詢', feed.errors[0]?.message || '資料來源未回傳有效路況。可稍後更新或查看交通部 TDX。');
         else if (!feed.feeds.some(group => group.sections.some(section => section.level))) setInfo('traffic', '資料時間或狀態未確認', '來源目前沒有有效觀測，稍後可更新查詢。');
-        else if (!segments.length) setInfo('traffic', '沿途未有資料', `已查詢國道、省道公開回報。${missing ? `${missing}來源目前無法查詢。` : '此路線尚無可比對的方向路段。'}`);
+        else if (!segments.length) setInfo('traffic', '沿途未有資料', `已查詢${checked}公開回報。${missing ? `${missing}來源目前無法查詢。` : '此路線尚無可比對的方向路段。'}`);
         else {
           const newest = segments.reduce((best, section) => Math.max(best, Date.parse(section.observedAt) || 0), 0);
           setInfo('traffic', `${segments.length} 路段`, `最新量測 ${dateText(newest)}。${missing ? `${missing}來源未提供可用資料。` : '尚無觀測的路段以藍線表示。'}`);
@@ -2054,7 +2061,7 @@
 
       function cameraResult(catalog) {
         const { matches, total } = cameraPoints(catalog);
-        setInfo('camera', total ? `沿途附近 ${total} 部` : '沿途附近無點位', `顯示距路線 ${cameraRange} 公尺內${total > maxCameras ? `最近的 ${maxCameras} 部` : '的攝影機'}。點「影」開啟官方串流。`);
+        setInfo('camera', total ? `沿途附近 ${total} 部` : '沿途附近無點位', `顯示距路線 ${cameraRange} 公尺內${total > maxCameras ? `最近的 ${maxCameras} 部` : '的攝影機'}。點「影」查看攝影機。`);
         return matches;
       }
 
@@ -2065,18 +2072,21 @@
           icon: L.divIcon({ className: 'route-camera-pin', html: '影', iconSize: [23, 23] }),
         }).addTo(layer).bindPopup(() => {
           const box = popup(camera.name, [`${camera.source.name} · 距路線約 ${Math.round(camera.distance)} 公尺`]);
-          const image = element('img');
-          img = image;
-          image.alt = `${camera.name} 即時影像`;
-          const fallback = element('p');
-          fallback.setAttribute('role', 'status');
-          image.addEventListener('error', () => { fallback.textContent = '這支攝影機暫時無法載入。'; image.hidden = true; });
-          image.src = camera.url;
-          const direct = element('a', '開啟官方串流');
+          if (!camera.linkOnly) {
+            const image = element('img');
+            img = image;
+            image.alt = `${camera.name} 即時影像`;
+            const fallback = element('p');
+            fallback.setAttribute('role', 'status');
+            image.addEventListener('error', () => { fallback.textContent = '這支攝影機暫時無法載入。'; image.hidden = true; });
+            image.src = camera.url;
+            box.append(image, fallback);
+          }
+          const direct = element('a', camera.linkOnly ? '開啟臺北市即時交通網查看影像' : '開啟官方串流');
           direct.href = camera.url;
           direct.target = '_blank';
           direct.rel = 'noopener noreferrer';
-          box.append(image, fallback, direct);
+          box.append(direct);
           return box;
         });
         marker.on('popupclose remove', () => img?.removeAttribute('src'));
@@ -2123,7 +2133,13 @@
       }
 
       const sources = {
-        traffic: [() => liveTraffic.load(), trafficResult],
+        traffic: [() => {
+          const { left, right, bottom, top } = corridor.bounds;
+          // Skip the Taipei request when the route is outside the city's approximate bounds.
+          const [west, south] = project([24.95, 121.44]);
+          const [east, north] = project([25.22, 121.68]);
+          return liveTraffic.load(right >= west && left <= east && top >= south && bottom <= north);
+        }, trafficResult],
         camera: [loadCameras, cameraResult],
         rain: [() => liveRain.load(), rainResult],
       };
