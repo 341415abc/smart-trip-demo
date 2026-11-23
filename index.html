@@ -243,6 +243,12 @@
     #live-map-mode .live-planner .panel-header,
     #live-map-mode .live-route-panel .panel-header { border-bottom: 1px solid var(--line); }
     #live-trip-form { display: grid; gap: 12px; padding: 14px; }
+    .flood-demo-launch { display: grid; gap: 6px; padding: 12px 14px; border-top: 1px solid var(--line); }
+    .flood-demo-launch p { margin: 0; }
+    .flood-demo-launch .btn { justify-self: start; }
+    .flood-demo-alert { margin: 0 12px 10px; padding: 10px 12px; border: 1px solid #dfb777; border-radius: 9px; background: #fff6e4; color: #5d3c19; }
+    .flood-demo-alert p { margin: 4px 0 0; }
+    .flood-demo-pin { display: grid; place-items: center; border: 2px solid white; border-radius: 50%; background: #b6303e; color: white; font-size: .82rem; font-weight: 800; box-shadow: 0 1px 5px #15365378; }
     #live-trip-form label { color: #3a556d; font-size: .875rem; font-weight: 750; }
     #live-map-mode .live-help {
       background: #edf6ff;
@@ -419,7 +425,7 @@
       <div class="live-layout">
         <section class="panel live-planner" aria-labelledby="live-planner-heading">
           <div class="panel-header">
-            <h2 id="live-planner-heading"><span class="section-icon" aria-hidden="true"><i class="icon pin"></i></span>搜尋地點</h2>
+            <h2 id="live-planner-heading"><span class="section-icon" aria-hidden="true"><i class="icon pin"></i></span>規劃行程</h2>
           </div>
           <form id="live-trip-form">
             <p class="live-help">輸入地標、車站或地址，搜尋後從結果選取地點。</p>
@@ -438,12 +444,22 @@
             <button class="btn primary full" id="live-submit" type="submit" aria-describedby="live-network-note">規劃路線</button>
             <p id="live-form-status" class="live-feedback" role="status" aria-live="polite"></p>
           </form>
+          <div class="flood-demo-launch">
+            <p><strong>臺北車站 → 士林夜市</strong></p>
+            <button class="btn" id="open-flood-demo" type="button" aria-controls="flood-demo-alert">試玩豪雨淹水繞路</button>
+            <button class="btn" id="close-flood-demo" type="button" hidden>返回即時規劃</button>
+          </div>
         </section>
         <div class="live-workspace">
           <section class="panel live-map-panel" aria-labelledby="live-map-heading">
             <div class="panel-header">
               <h2 id="live-map-heading"><span class="section-icon" aria-hidden="true"><i class="icon pin"></i></span>路線地圖</h2>
               <a class="btn live-google" id="live-google-link" target="_blank" rel="noopener noreferrer" hidden>在 Google 地圖開啟</a>
+            </div>
+            <div class="flood-demo-alert" id="flood-demo-alert" role="status" tabindex="-1" hidden>
+              <strong>豪雨與淹水模擬 · 非即時警報</strong>
+              <p>承德路三段與民族西路口出現模擬積水，情境中設為封閉。原路線經過該路口，紅色虛線表示原路線。</p>
+              <p>建議走藍色路線，改經中山北路避開封閉路口。橘色為模擬豪雨範圍，繞路仍可能遇到豪雨。</p>
             </div>
             <div class="route-layer-toolbar" id="route-layer-toolbar" hidden>
               <div class="route-layer-toggles" role="group" aria-label="沿途地圖圖層">
@@ -2205,6 +2221,91 @@
     })();
     (() => {
       const fields = [];
+      const floodDemoHash = '#flood-simulation';
+      const floodPoint = [25.06853, 121.51853];
+      const floodRadius = 150;
+      // Saved FOSSGIS / OpenStreetMap driving paths for the classroom simulation.
+      const floodDemoRoutes = [
+        {
+          label: '原路線 · 經承德路 · 需避開',
+          note: '原路線通過模擬積水封閉路口。請切回建議繞行，查看如何避開。',
+          duration: 459, distance: 4724.4,
+          path: [
+            [25.048865, 121.515166], [25.048696, 121.516279], [25.048684, 121.516361], [25.048668, 121.516461], [25.048852, 121.51655],
+            [25.049289, 121.516664], [25.049565, 121.516739], [25.049653, 121.516763], [25.049887, 121.516827], [25.049972, 121.51685],
+            [25.050449, 121.516981], [25.050781, 121.517073], [25.050875, 121.517126], [25.050947, 121.517148], [25.051291, 121.517243],
+            [25.051561, 121.517319], [25.051749, 121.517374], [25.051888, 121.517418], [25.051925, 121.517426], [25.052247, 121.517516],
+            [25.052523, 121.517592], [25.052609, 121.517601], [25.053102, 121.517743], [25.053198, 121.517771], [25.053282, 121.517795],
+            [25.053362, 121.51782], [25.053726, 121.517933], [25.053966, 121.518014], [25.054615, 121.518232], [25.054866, 121.51826],
+            [25.054941, 121.518263], [25.055317, 121.518253], [25.055531, 121.51825], [25.055798, 121.518247], [25.056228, 121.518249],
+            [25.056292, 121.518248], [25.056429, 121.518242], [25.05671, 121.518238], [25.057081, 121.518238], [25.057216, 121.518238],
+            [25.057312, 121.518245], [25.057347, 121.518248], [25.057467, 121.518259], [25.057699, 121.518264], [25.058089, 121.518275],
+            [25.058371, 121.518279], [25.058441, 121.518275], [25.058521, 121.51827], [25.058807, 121.518275], [25.059151, 121.518281],
+            [25.059509, 121.518288], [25.060103, 121.518302], [25.060207, 121.518304], [25.0603, 121.518307], [25.060936, 121.518321],
+            [25.061207, 121.51832], [25.061367, 121.518325], [25.061615, 121.518333], [25.062259, 121.518354], [25.06268, 121.518366],
+            [25.062823, 121.518369], [25.062958, 121.518376], [25.063087, 121.518383], [25.063232, 121.518385], [25.064653, 121.518405],
+            [25.065097, 121.518415], [25.0657, 121.518427], [25.065762, 121.518428], [25.06586, 121.518431], [25.065984, 121.518432],
+            [25.066048, 121.518439], [25.066203, 121.518441], [25.066472, 121.518445], [25.066865, 121.518454], [25.067205, 121.51846],
+            [25.067301, 121.518461], [25.067347, 121.518462], [25.067701, 121.518466], [25.068062, 121.518478], [25.068303, 121.518485],
+            [25.068354, 121.518487], [25.068409, 121.518488], [25.068527, 121.518491], [25.068654, 121.518495], [25.069122, 121.518505],
+            [25.06947, 121.518508], [25.069861, 121.518507], [25.0702, 121.518518], [25.070425, 121.518525], [25.070569, 121.51853],
+            [25.070665, 121.518535], [25.071153, 121.518549], [25.071437, 121.518579], [25.071641, 121.518619], [25.071789, 121.518656],
+            [25.071914, 121.518683], [25.072034, 121.518723], [25.072259, 121.5188], [25.072435, 121.518874], [25.072694, 121.519001],
+            [25.073009, 121.51919], [25.07306, 121.519219], [25.073876, 121.51971], [25.07394, 121.51975], [25.073988, 121.519778],
+            [25.074314, 121.519901], [25.075018, 121.52017], [25.075146, 121.520216], [25.075227, 121.520226], [25.075374, 121.520272],
+            [25.078247, 121.521302], [25.078915, 121.521542], [25.078977, 121.521565], [25.080155, 121.522176], [25.080228, 121.522221],
+            [25.080297, 121.522269], [25.080683, 121.522475], [25.080744, 121.52251], [25.080793, 121.522536], [25.081384, 121.522853],
+            [25.081704, 121.523001], [25.082108, 121.523181], [25.082176, 121.523211], [25.082321, 121.523261], [25.08291, 121.523462],
+            [25.083193, 121.523533], [25.083402, 121.52357], [25.083633, 121.523601], [25.08394, 121.523624], [25.084028, 121.523625],
+            [25.084222, 121.523629], [25.084333, 121.523628], [25.08488, 121.523564], [25.085454, 121.523444], [25.08561, 121.523415],
+            [25.085736, 121.523389], [25.086204, 121.523229], [25.086838, 121.522904], [25.087335, 121.522613], [25.087936, 121.523788],
+            [25.087981, 121.523885], [25.08792, 121.523922], [25.08783, 121.523972],
+          ],
+        },
+        {
+          label: '建議繞行 · 經中山北路',
+          note: '從市民大道一段轉中山北路，經中山橋，再由劍潭路接基河路抵達士林夜市。',
+          duration: 442.4, distance: 5409.6,
+          path: [
+            [25.048865, 121.515166], [25.048696, 121.516279], [25.048684, 121.516361], [25.048668, 121.516461], [25.048465, 121.517693],
+            [25.048445, 121.517824], [25.048409, 121.518054], [25.048407, 121.518069], [25.048335, 121.518612], [25.048294, 121.518901],
+            [25.048281, 121.518992], [25.048264, 121.519107], [25.048167, 121.519729], [25.048078, 121.520301], [25.048045, 121.520474],
+            [25.048038, 121.52051], [25.048027, 121.520572], [25.047999, 121.520711], [25.048143, 121.520778], [25.048173, 121.520794],
+            [25.048257, 121.520836], [25.048298, 121.520856], [25.049729, 121.52158], [25.049828, 121.521631], [25.049967, 121.521695],
+            [25.049999, 121.52171], [25.050967, 121.522146], [25.051282, 121.522276], [25.051619, 121.522393], [25.051746, 121.522429],
+            [25.052058, 121.522504], [25.052193, 121.522536], [25.05231, 121.522564], [25.05246, 121.522573], [25.054886, 121.522701],
+            [25.054991, 121.522706], [25.055089, 121.522712], [25.057695, 121.522849], [25.057776, 121.522853], [25.057921, 121.522861],
+            [25.05809, 121.522868], [25.060205, 121.52296], [25.060339, 121.522966], [25.060414, 121.522969], [25.060623, 121.522975],
+            [25.060888, 121.522973], [25.061307, 121.522938], [25.061638, 121.522889], [25.062576, 121.522673], [25.062698, 121.522645],
+            [25.062841, 121.522612], [25.06298, 121.52258], [25.063936, 121.52236], [25.064528, 121.522283], [25.064804, 121.522267],
+            [25.064908, 121.522261], [25.064976, 121.52226], [25.065454, 121.522256], [25.06594, 121.522289], [25.066313, 121.522332],
+            [25.066761, 121.522418], [25.066784, 121.522423], [25.066843, 121.522434], [25.066914, 121.522454], [25.068318, 121.522829],
+            [25.068403, 121.522852], [25.068487, 121.522875], [25.068607, 121.522907], [25.070597, 121.52344], [25.070635, 121.52345],
+            [25.070737, 121.523548], [25.072657, 121.524063], [25.07297, 121.524146], [25.073398, 121.524265], [25.07347, 121.524297],
+            [25.073546, 121.524344], [25.073606, 121.524396], [25.073668, 121.524453], [25.073725, 121.524517], [25.074082, 121.525109],
+            [25.074343, 121.525542], [25.074383, 121.525622], [25.07442, 121.525697], [25.074453, 121.525778], [25.074464, 121.525806],
+            [25.074511, 121.525927], [25.074595, 121.52613], [25.074706, 121.526334], [25.074815, 121.526494], [25.074913, 121.526604],
+            [25.075037, 121.526685], [25.075143, 121.526737], [25.075322, 121.526788], [25.075536, 121.526803], [25.075692, 121.526809],
+            [25.075737, 121.526812], [25.075895, 121.5268], [25.076011, 121.526781], [25.076198, 121.526742], [25.076321, 121.526704],
+            [25.076386, 121.526675], [25.076447, 121.526645], [25.076515, 121.526587], [25.076573, 121.526527], [25.076635, 121.526463],
+            [25.076677, 121.526406], [25.076716, 121.526353], [25.076871, 121.525847], [25.076986, 121.525528], [25.076989, 121.525518],
+            [25.077001, 121.525501], [25.077034, 121.525456], [25.077062, 121.525375], [25.077111, 121.525302], [25.077161, 121.525264],
+            [25.077213, 121.525241], [25.07727, 121.52522], [25.077346, 121.525202], [25.077443, 121.525176], [25.078092, 121.525007],
+            [25.079659, 121.524545], [25.079719, 121.524524], [25.07987, 121.524428], [25.079995, 121.524398], [25.080199, 121.524354],
+            [25.080363, 121.524328], [25.080489, 121.524323], [25.08063, 121.524331], [25.080768, 121.524345], [25.080847, 121.524362],
+            [25.080917, 121.52438], [25.081054, 121.524441], [25.081186, 121.52451], [25.08131, 121.524597], [25.081893, 121.525039],
+            [25.082153, 121.525194], [25.082193, 121.525218], [25.082461, 121.525336], [25.082757, 121.52542], [25.083097, 121.525476],
+            [25.084138, 121.525509], [25.084136, 121.525427], [25.084196, 121.525306], [25.084245, 121.525062], [25.084279, 121.524888],
+            [25.084284, 121.524859], [25.084285, 121.524787], [25.0844, 121.524815], [25.085078, 121.524999], [25.085754, 121.525185],
+            [25.085924, 121.525164], [25.085999, 121.524996], [25.086075, 121.52492], [25.086217, 121.524844], [25.087596, 121.524101],
+            [25.087788, 121.523995], [25.08783, 121.523972],
+          ],
+        },
+      ];
+      const demoStart = $('open-flood-demo');
+      const demoExit = $('close-flood-demo');
+      const demoAlert = $('flood-demo-alert');
+      let floodDemoActive = false;
       let nextField = 0;
       let routeController;
       let destinations = [];
@@ -2358,6 +2459,12 @@
 
       function resetRoute() {
         routeController?.abort();
+        if (floodDemoActive) {
+          floodDemoActive = false;
+          demoAlert.hidden = demoExit.hidden = true;
+          demoStart.hidden = $('live-trip-form').hidden = false;
+          if (location.hash === floodDemoHash) history.replaceState(null, '', location.pathname + location.search);
+        }
         $('live-submit').disabled = false;
         setStatus(formStatus);
         setStatus(routeNote);
@@ -2422,14 +2529,20 @@
       function drawLiveTrip() {
         if (!mapLayers || !map || $('live-map-mode').hidden) return;
         mapLayers.clearLayers();
+        if (floodDemoActive) {
+          L.circle(floodPoint, { radius: 1100, color: '#af6015', weight: 2, dashArray: '6 6', fillColor: '#e99d29', fillOpacity: .2, interactive: false }).addTo(mapLayers);
+          L.circle(floodPoint, { radius: floodRadius, color: '#b6303e', weight: 3, fillColor: '#dc686c', fillOpacity: .33, interactive: false }).addTo(mapLayers);
+        }
         routes.forEach((route, index) => {
           if (index === chosen) return;
-          L.polyline(route.path, { color: '#57768d', weight: 5, opacity: .7, dashArray: '6 7' }).addTo(mapLayers);
+          const color = floodDemoActive ? (index === 0 ? '#b6303e' : '#1766c5') : '#57768d';
+          L.polyline(route.path, { color, weight: 5, opacity: .7, dashArray: index === 0 || !floodDemoActive ? '6 7' : null }).addTo(mapLayers);
         });
         const selected = routes[chosen];
         if (selected) {
+          const blocked = floodDemoActive && chosen === 0;
           L.polyline(selected.path, { color: '#fff', weight: 10, opacity: .9 }).addTo(mapLayers);
-          L.polyline(selected.path, { color: '#1766c5', weight: 6, opacity: 1 }).addTo(mapLayers);
+          L.polyline(selected.path, { color: blocked ? '#b6303e' : '#1766c5', weight: 6, opacity: 1, dashArray: blocked ? '7 7' : null }).addTo(mapLayers);
           selected.waypoints.forEach((snap, index) => {
             if (!(snap?.distance >= 80) || !destinations[index]) return;
             const place = destinations[index];
@@ -2445,6 +2558,20 @@
           }).addTo(mapLayers).bindPopup(popup);
         });
         const points = destinations.map(place => [place.lat, place.lng]);
+        if (floodDemoActive) {
+          const issue = document.createElement('div');
+          issue.className = 'route-data-popup';
+          const title = document.createElement('strong');
+          title.textContent = '承德路三段 × 民族西路';
+          const detail = document.createElement('p');
+          detail.textContent = '模擬淹水封閉。原路線經過此處，請查看經中山北路的示範繞行。';
+          issue.append(title, detail);
+          L.marker(floodPoint, {
+            title: '模擬淹水封閉點', alt: '模擬淹水封閉點',
+            icon: L.divIcon({ className: 'flood-demo-pin', html: '淹', iconSize: [29, 29], iconAnchor: [14, 14] }),
+          }).addTo(mapLayers).bindPopup(issue);
+          points.push(...routes.flatMap(route => route.path));
+        }
         if (selected) map.fitBounds(L.latLngBounds(points).extend(L.latLngBounds(selected.path)), { padding: [32, 32], maxZoom: 16 });
         else if (points.length > 1) map.fitBounds(points, { padding: [30, 30], maxZoom: 15 });
         else if (points.length === 1) map.setView(points[0], 14);
@@ -2461,16 +2588,18 @@
       function paintRoute() {
         const selected = routes[chosen];
         const mode = $('live-mode').value === 'walking' ? '步行' : '開車';
-        summary.textContent = `${mode}約 ${durationText(selected.duration)} · ${distanceText(selected.distance)}`;
+        summary.textContent = `${floodDemoActive ? '示範開車' : mode}約 ${durationText(selected.duration)} · ${distanceText(selected.distance)}`;
         const offRoad = selected.waypoints.flatMap((snap, index) => snap?.distance >= 80 && destinations[index]
           ? [`${destinations[index].name}（約 ${Math.round(snap.distance)} 公尺）`] : []);
-        setStatus(routeNote, offRoad.length ? `棕色虛線標出定位點與可通行道路的距離。${offRoad.join('、')}，這段距離未計入路線。` : '');
+        const snapNote = offRoad.length ? `棕色虛線標出定位點與可通行道路的距離。${offRoad.join('、')}，這段距離未計入路線。` : '';
+        setStatus(routeNote, floodDemoActive ? selected.note : snapNote);
         if (routes.length > 1) {
           options.replaceChildren(...routes.map((route, index) => {
             const option = document.createElement('button');
             option.type = 'button';
             option.className = 'live-route-choice';
-            option.textContent = `${index === 0 ? '主要路線' : `替代路線 ${index}`} · ${durationText(route.duration)} · ${distanceText(route.distance)}`;
+            const label = floodDemoActive ? route.label : index === 0 ? '主要路線' : `替代路線 ${index}`;
+            option.textContent = `${label} · ${durationText(route.duration)} · ${distanceText(route.distance)}`;
             option.setAttribute('aria-pressed', String(index === chosen));
             option.addEventListener('click', () => { chosen = index; paintRoute(); options.children[index].focus(); });
             return option;
@@ -2488,7 +2617,7 @@
         }));
         legList.hidden = false;
         drawLiveTrip();
-        liveRouteOverlays.select(selected.path);
+        if (!floodDemoActive) liveRouteOverlays.select(selected.path);
       }
 
       async function planLiveTrip(event) {
@@ -2528,6 +2657,25 @@
         }
       }
 
+      function openFloodDemo(focusAlert = false) {
+        if (floodDemoActive) return;
+        resetRoute();
+        floodDemoActive = true;
+        demoStart.hidden = $('live-trip-form').hidden = true;
+        demoAlert.hidden = demoExit.hidden = false;
+        updateGoogleLink([]);
+        destinations = [
+          { name: '臺北車站', lat: 25.04867, lng: 121.51513 },
+          { name: '士林夜市（士林市場對面）', lat: 25.087808, lng: 121.523924 },
+        ];
+        routes = floodDemoRoutes.map(route => ({ ...route, legs: [route], waypoints: [] }));
+        chosen = 1;
+        if (location.protocol !== 'file:' && location.hash !== floodDemoHash) history.replaceState(null, '', floodDemoHash);
+        showTripMode(false);
+        paintRoute();
+        if (focusAlert) demoAlert.focus();
+      }
+
       function showTripMode(classroom) {
         $('scenario-mode').hidden = !classroom;
         $('classroom-snapshot').hidden = !classroom;
@@ -2550,6 +2698,8 @@
         resetRoute();
       });
       $('live-trip-form').addEventListener('submit', planLiveTrip);
+      demoStart.addEventListener('click', () => openFloodDemo(true));
+      demoExit.addEventListener('click', () => { resetRoute(); demoStart.focus(); });
       $('live-mode').addEventListener('change', () => { setStatus(formStatus); resetRoute(); });
       $('go-classroom').addEventListener('click', () => showTripMode(true));
       const localFile = location.protocol === 'file:';
@@ -2558,7 +2708,9 @@
         else showTripMode(false);
       });
       if (localFile) $('go-live-trip').title = '開啟線上的地點搜尋與導航';
-      showTripMode(localFile || location.hash === '#scenario-mode');
+      if (location.hash === floodDemoHash) openFloodDemo();
+      else showTripMode(localFile || location.hash === '#scenario-mode');
+      window.addEventListener('hashchange', () => { if (location.hash === floodDemoHash) openFloodDemo(); });
     })();
   </script>
 </body>
