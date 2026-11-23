@@ -364,6 +364,23 @@
     #live-route-legs li { padding-block: 5px; overflow-wrap: anywhere; }
     #live-route-legs li + li { border-top: 1px solid #edf2f6; }
     #live-route-legs li span { display: block; color: var(--muted); }
+    .route-layer-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 6px 12px; flex-wrap: wrap; margin: 0 12px 10px; }
+    .route-layer-toggles { display: flex; flex-wrap: wrap; gap: 5px; }
+    .route-layer-toggles label { display: flex; align-items: center; gap: 6px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 7px; background: #f5faff; font-size: .8125rem; cursor: pointer; }
+    .route-layer-toggles input { width: 15px; min-height: 0; height: 15px; margin: 0; padding: 0; accent-color: var(--blue); }
+    .route-layer-key { width: 9px; height: 9px; border-radius: 50%; background: #398478; }
+    .route-layer-key.camera-key { background: #1d5495; }
+    .route-layer-key.rain-key { background: #a6570d; }
+    .route-feed-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 7px; margin: 0 12px 12px; }
+    .route-feed-summary details { min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; background: #f8fcff; font-size: .8125rem; color: var(--muted); overflow-wrap: anywhere; }
+    .route-feed-summary summary { color: var(--ink); font-weight: 750; }
+    .route-feed-summary details p { margin-top: 4px; }
+    .route-feed-summary details ul { padding-left: 18px; margin: 5px 0 0; }
+    .route-feed-summary details li + li { margin-top: 3px; }
+    .route-camera-pin { display: grid; place-items: center; border-radius: 7px; border: 2px solid white; background: #1d5495; color: white; box-shadow: 0 1px 5px #15365378; font-weight: 800; font-size: .75rem; }
+    .route-data-popup { min-width: 175px; }
+    .route-data-popup p { margin: 4px 0 7px; }
+    .route-data-popup img { display: block; width: min(225px, 58vw); max-height: 148px; object-fit: contain; background: #142c40; border-radius: 5px; }
     @media (max-width: 860px) {
       #live-map-mode .live-layout { grid-template-columns: minmax(0, 1fr); }
       #live-map { height: 365px; }
@@ -387,7 +404,7 @@
       <div>
         <div class="project">G02 · T08 旅遊交通優化</div>
         <h1 id="page-title">北北基桃智慧出遊</h1>
-        <p id="trip-intro">搜尋地點、安排停靠點，在地圖上查看實際道路路線。</p>
+        <p id="trip-intro">規劃路線後，在地圖上查看沿途路況、CCTV 與雨天警示。</p>
       </div>
       <div class="snapshot" id="classroom-snapshot" hidden><strong>展示快照 · 2026/11/28 09:00</strong><span>模擬資料 · 台灣時間</span></div>
     </div>
@@ -428,13 +445,40 @@
               <h2 id="live-map-heading"><span class="section-icon" aria-hidden="true"><i class="icon pin"></i></span>路線地圖</h2>
               <a class="btn live-google" id="live-google-link" target="_blank" rel="noopener noreferrer" hidden>在 Google 地圖開啟</a>
             </div>
+            <div class="route-layer-toolbar" id="route-layer-toolbar" hidden>
+              <div class="route-layer-toggles" role="group" aria-label="沿途地圖圖層">
+                <label><input type="checkbox" id="map-traffic-layer" checked><i class="route-layer-key" aria-hidden="true"></i>即時路況</label>
+                <label><input type="checkbox" id="map-camera-layer" checked><i class="route-layer-key camera-key" aria-hidden="true"></i>CCTV</label>
+                <label><input type="checkbox" id="map-rain-layer" checked><i class="route-layer-key rain-key" aria-hidden="true"></i>雨天警示</label>
+              </div>
+              <button class="btn" id="route-layer-refresh" type="button">更新沿途資料</button>
+            </div>
             <div id="live-map" role="region" aria-label="互動路線地圖"></div>
             <p id="live-map-status" class="live-feedback live-map-status" role="status" aria-live="polite"></p>
+            <div class="route-feed-summary" id="route-feed-summary" hidden>
+              <details id="route-traffic-details">
+                <summary id="route-traffic-status">即時路況</summary>
+                <p>依官方國道、省道回報與行車方向比對。綠色為順暢、黃橘色為車流較多或壅塞、紅色為嚴重壅塞。藍色為規劃路線。</p>
+                <p id="route-traffic-info"></p>
+                <p><a href="https://tdx.transportdata.tw/api-service/swagger/basic/7f07d940-91a4-495d-9465-1c9df89d709c" target="_blank" rel="noopener">交通部 TDX 路況</a></p>
+              </details>
+              <details id="route-camera-details">
+                <summary id="route-camera-status">CCTV</summary>
+                <p id="route-camera-info">點選地圖上的「影」開啟官方即時影像。</p>
+                <ul id="route-camera-list" hidden></ul>
+              </details>
+              <details id="route-rain-details">
+                <summary id="route-rain-status">雨天警示</summary>
+                <p id="route-rain-info"></p>
+                <ul id="route-rain-list" hidden></ul>
+                <p><a href="https://www.cwa.gov.tw/V8/C/P/Warning/W26.html" target="_blank" rel="noopener">中央氣象署豪大雨特報</a></p>
+              </details>
+            </div>
           </section>
           <section class="panel live-route-panel" aria-labelledby="live-directions-heading">
             <div class="panel-header">
               <h2 id="live-directions-heading"><span class="section-icon" aria-hidden="true"><i class="icon cal"></i></span>路線與行程</h2>
-              <span class="minor">路網估算 · 即時路況與水情請另查</span>
+              <span class="minor">時間依路網估算</span>
             </div>
             <div class="live-dirs-content">
               <p id="live-route-summary" aria-live="polite">選取出發地與目的地後，這裡會顯示路線距離、時間及分段行程。</p>
@@ -448,6 +492,7 @@
             <span aria-hidden="true"> ・ </span> 路線 <a href="https://routing.openstreetmap.de/" target="_blank" rel="noopener noreferrer">FOSSGIS OSRM</a>
             <span aria-hidden="true"> ・ </span> 地圖資料 © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap 貢獻者</a>
             <span aria-hidden="true"> ・ </span> <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener noreferrer">回報地圖錯誤</a>
+            <br>沿途資料 <a href="https://data.gov.tw/dataset/37665" target="_blank" rel="noopener">交通部高速公路局</a>、<a href="https://data.gov.tw/dataset/29817" target="_blank" rel="noopener">交通部公路局</a>、<a href="https://data.gov.tw/dataset/59458" target="_blank" rel="noopener">基隆市政府交通處</a>、<a href="https://registry.opendata.aws/cwa_opendata/" target="_blank" rel="noopener">中央氣象署</a>（<a href="https://data.gov.tw/license" target="_blank" rel="noopener">政府資料開放授權條款第 1 版</a>）
           </p>
         </div>
       </div>
@@ -1339,6 +1384,809 @@
 
       return { search, route };
     })();
+    const liveTraffic = (() => {
+      const providers = [
+        { key: 'freeway', api: 'Freeway', source: '交通部高速公路局／TDX' },
+        { key: 'highway', api: 'Highway', source: '交通部公路局／TDX' },
+      ];
+      const base = 'https://tdx.transportdata.tw/api/basic/v2/Road/Traffic/Live/';
+      const cacheDuration = 120000;
+      const maxSampleAge = 15 * 60000;
+      const quotaStorageKey = 'smart-trip-tdx-guest-quota';
+      const guestDailyLimit = 20;
+      let memoryQuota;
+      let cache;
+      let pending;
+      let catalogRequest;
+
+      function loadCatalog() {
+        if (!catalogRequest) catalogRequest = fetch('./route-traffic.json', { signal: AbortSignal.timeout(12000) })
+          .then(response => {
+            if (!response.ok) throw new Error('無法載入路段圖資。');
+            return response.json();
+          }).catch(error => { catalogRequest = undefined; throw error; });
+        return catalogRequest;
+      }
+
+      function reserveRequest() {
+        const day = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
+        let quota = memoryQuota;
+        try {
+          const saved = JSON.parse(localStorage.getItem(quotaStorageKey));
+          if (saved?.day === day && Number.isInteger(saved.count)) quota = saved;
+        } catch { /* Browser storage is optional. */ }
+        const count = quota?.day === day ? quota.count : 0;
+        if (count >= guestDailyLimit) return false;
+        memoryQuota = { day, count: count + 1 };
+        try {
+          localStorage.setItem(quotaStorageKey, JSON.stringify(memoryQuota));
+        } catch { /* The current tab still enforces the limit. */ }
+        return true;
+      }
+
+      function asTime(value) {
+        if (typeof value !== 'string' || !value.trim()) return null;
+        const localTime = value.trim().replace(' ', 'T');
+        const time = Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(localTime) ? localTime : `${localTime}+08:00`);
+        return Number.isFinite(time) ? time : null;
+      }
+
+      function asNumber(value) {
+        if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+        if (typeof value !== 'string' || !value.trim()) return null;
+        const number = Number(value);
+        return Number.isFinite(number) ? number : null;
+      }
+
+      function unpackPath(encoded) {
+        const result = [];
+        let offset = 0;
+        let lat = 0;
+        let lng = 0;
+        function readDelta() {
+          let result = 0;
+          let shift = 0;
+          let chunk;
+          do {
+            chunk = encoded.charCodeAt(offset++) - 63;
+            result |= (chunk & 31) << shift;
+            shift += 5;
+          } while (chunk >= 32 && offset < encoded.length);
+          return result & 1 ? ~(result >> 1) : result >> 1;
+        }
+        while (offset < encoded.length) {
+          lat += readDelta();
+          lng += readDelta();
+          result.push([lat / 100000, lng / 100000]);
+        }
+        return result;
+      }
+
+      function normalizeFeed(provider, payload, checkedAt, trafficCatalog) {
+        const rows = Array.isArray(payload) ? payload : payload?.LiveTraffics ?? payload?.value;
+        if (!Array.isArray(rows)) throw new Error('即時路況回應格式有誤。');
+        const catalog = trafficCatalog[provider.key];
+        const byId = new Map();
+        let latest = null;
+        for (const row of rows) {
+          if (row?.SectionID == null) continue;
+          const id = String(row.SectionID).trim();
+          if (!Object.hasOwn(catalog, id)) continue;
+          const [name, direction, encodedPaths] = catalog[id];
+          const timestamp = asTime(row.DataCollectTime);
+          if (byId.has(id) && (byId.get(id).timestamp ?? -Infinity) >= (timestamp ?? -Infinity)) continue;
+          const age = timestamp === null ? Infinity : checkedAt - timestamp;
+          const fresh = age >= -120000 && age <= maxSampleAge;
+          const level = asNumber(row.CongestionLevel);
+          const speed = asNumber(row.TravelSpeed);
+          if (timestamp !== null && age >= -120000) latest = Math.max(latest ?? timestamp, timestamp);
+          byId.set(id, {
+            id, name, direction, timestamp,
+            level: fresh && Number.isInteger(level) && level >= 1 && level <= 5 ? level : null,
+            speed: fresh && speed !== null && speed >= 0 ? speed : null,
+            observedAt: timestamp === null ? null : new Date(timestamp).toISOString(),
+            paths: encodedPaths.map(unpackPath),
+          });
+        }
+        if (rows.length && !byId.size) throw new Error('即時路況未能對應現有路段圖資。');
+        const issuedAt = asTime(payload?.UpdateTime) ?? latest;
+        return {
+          key: provider.key, source: provider.source,
+          issuedAt: issuedAt === null ? null : new Date(issuedAt).toISOString(),
+          checkedAt: new Date(checkedAt).toISOString(),
+          sections: [...byId.values()].map(({ timestamp, ...section }) => section),
+        };
+      }
+
+      async function fetchProvider(provider, trafficCatalog) {
+        if (!reserveRequest()) throw new Error('本瀏覽器已達今日 TDX 訪客查詢上限。');
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 12000);
+        try {
+          const response = await fetch(base + provider.api, { signal: controller.signal });
+          if (response.status === 429) throw new Error('TDX 查詢額度或頻率受限，請稍後再試。');
+          if (response.status === 401 || response.status === 403) throw new Error('目前無法以 TDX 訪客身分取得即時路況。');
+          if (!response.ok) throw new Error(`TDX 暫時無法取得路況（HTTP ${response.status}）。`);
+          const payload = await response.json();
+          return normalizeFeed(provider, payload, Date.now(), trafficCatalog);
+        } catch (error) {
+          if (controller.signal.aborted) throw new Error('即時路況服務逾時。');
+          if (error instanceof TypeError) throw new Error('無法連線至即時路況服務。');
+          if (error instanceof SyntaxError) throw new Error('即時路況回應格式有誤。');
+          throw error;
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+
+      async function load() {
+        const now = Date.now();
+        if (cache && now < cache.expires) {
+          return {
+            ...cache.data,
+            feeds: cache.data.feeds.map(feed => ({
+              ...feed,
+              sections: feed.sections.map(section =>
+                (section.level !== null || section.speed !== null) && now - Date.parse(section.observedAt) > maxSampleAge
+                  ? { ...section, level: null, speed: null } : section),
+            })),
+          };
+        }
+        if (!pending) {
+          pending = loadCatalog().then(catalog => Promise.allSettled(providers.map(provider => fetchProvider(provider, catalog)))).then(results => {
+            const data = { feeds: [], errors: [] };
+            results.forEach((result, i) => {
+              if (result.status === 'fulfilled') data.feeds.push(result.value);
+              else data.errors.push({ key: providers[i].key, message: result.reason.message });
+            });
+            cache = { data, expires: Date.now() + cacheDuration };
+            return data;
+          }).finally(() => { pending = undefined; });
+        }
+        return pending;
+      }
+
+      return { load };
+    })();
+    const liveRain = (() => {
+      const warningFeed = 'https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Warning/W-C0033-001.json';
+      const districtWarningFeed = 'https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Warning/W-C0033-003.cap';
+      const countyBoundaryFeed = 'https://dwgis1.ncdr.nat.gov.tw/server/rest/services/MAP0751/Coastline2025/MapServer/33/query';
+      const districtBoundaryFeed = 'https://dwgis1.ncdr.nat.gov.tw/server/rest/services/MAP0751/Coastline2025/MapServer/34/query';
+      const source = '中央氣象署 W-C0033-001';
+      const dataLifetime = 24 * 60 * 60 * 1000;
+      const refreshInterval = 60 * 1000;
+      const rainPhenomenon = /超大豪雨|大豪雨|豪雨|豪[（(]大[）)]雨|大雨/;
+      const countyFeatures = new Map();
+      const districtFeatures = new Map();
+      let cachedSnapshot;
+      let pending;
+
+      function asArray(value) {
+        return value == null || value === '' ? [] : Array.isArray(value) ? value : [value];
+      }
+
+      function normalizedArea(value) {
+        return String(value ?? '').trim().replaceAll('台', '臺').replace(/\s/g, '');
+      }
+
+      function timeValue(value) {
+        if (typeof value !== 'string') return NaN;
+        const text = value.trim().replace(' ', 'T');
+        if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(text)) return NaN;
+        return Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(text) ? text : `${text}+08:00`);
+      }
+
+      async function readData(url, format = 'json', timeout = 8000) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeout);
+        try {
+          const response = await fetch(url, { signal: controller.signal });
+          if (!response.ok) throw new Error('資料來源暫時無法使用。');
+          return await response[format]();
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+
+      function countyAlerts(documentData, now) {
+        const feed = documentData?.cwaopendata;
+        const locations = feed?.dataset?.location;
+        const distinctCounties = new Set(asArray(locations).map(item => normalizedArea(item?.locationName)));
+        const issuedAt = timeValue(feed?.sent);
+        if (!Array.isArray(locations) || distinctCounties.size !== 22 || distinctCounties.has('')
+          || feed.status !== 'Actual' || (feed.scope && feed.scope !== 'Public') || !Number.isFinite(issuedAt)) {
+          throw new Error('中央氣象署警特報資料不完整，目前無法確認。');
+        }
+        if (now - issuedAt > dataLifetime || issuedAt - now > 10 * 60 * 1000) {
+          throw new Error('中央氣象署警特報資料時間異常或已超過 24 小時，目前無法確認。');
+        }
+
+        const alerts = new Map();
+        for (const location of locations) {
+          const county = normalizedArea(location.locationName);
+          if (location.hazardConditions === undefined) {
+            throw new Error('中央氣象署警特報缺少縣市資料，目前無法確認。');
+          }
+          for (const hazardGroup of asArray(location.hazardConditions?.hazards)) {
+            if (!hazardGroup || typeof hazardGroup !== 'object' || !Object.keys(hazardGroup).length) continue;
+            const summary = hazardGroup.info ?? {};
+            const detailHazards = asArray(hazardGroup.hazard);
+            const details = detailHazards.length ? detailHazards : [hazardGroup];
+            for (const hazard of details) {
+              const info = hazard?.info ?? {};
+              const phenomenon = info.phenomena || summary.phenomena;
+              if (typeof phenomenon !== 'string' || !phenomenon.trim()) {
+                throw new Error('中央氣象署警特報缺少天氣現象，目前無法確認。');
+              }
+              const rain = phenomenon.match(rainPhenomenon);
+              if (!rain || /解除/.test(phenomenon)) continue;
+              const window = hazard?.validTime ?? hazardGroup.validTime ?? {};
+              const from = timeValue(window.startTime);
+              const to = timeValue(window.endTime);
+              if (!Number.isFinite(from) || !Number.isFinite(to) || from >= to) {
+                throw new Error('中央氣象署的降雨特報缺少有效時間，目前無法確認。');
+              }
+              if (now < from || now >= to) continue;
+              const affected = asArray((info.affectedAreas ?? summary.affectedAreas)?.location)
+                .map(item => normalizedArea(item?.locationName)).filter(Boolean);
+              const areas = [...new Set(affected)];
+              const explicitlyWhole = areas.length === 1 && (
+                areas[0] === county || areas[0] === `${county}全區` || ['全區', '全縣', '全市'].includes(areas[0])
+              );
+              const area = explicitlyWhole || !areas.length ? county : `${county} · ${areas.join('、')}`;
+              const name = `${rain[0]}${info.significance || summary.significance || '特報'}`;
+              const id = `${location.geocode || county}/${name}/${from}/${area}`;
+              alerts.set(id, {
+                id, name, area, county, explicitlyWhole, feature: null, coverage: 'county',
+                description: areas.length ? `氣象署公告影響範圍為${areas.join('、')}。`
+                  : '氣象署列有縣市特報，這筆資料未提供細部影響範圍。',
+                from: new Date(from).toISOString(), to: new Date(to).toISOString(),
+              });
+            }
+          }
+        }
+        return { issuedAt: new Date(issuedAt).toISOString(), alerts: [...alerts.values()] };
+      }
+
+      async function loadCountyFeatures(alerts) {
+        const targets = [...new Set(alerts.map(alert => alert.county)
+          .filter(county => !countyFeatures.has(county)))];
+        if (!targets.length) return;
+        const names = [...new Set(targets.flatMap(county => [county, county.replaceAll('臺', '台')]))];
+        const values = names.map(name => `'${name.replaceAll("'", "''")}'`).join(',');
+        const url = new URL(countyBoundaryFeed);
+        url.search = new URLSearchParams({
+          f: 'geojson', where: `CITYNAME2 IN (${values}) OR CITYNAME IN (${values})`,
+          outFields: 'CITYNAME2,CITYNAME', outSR: '4326', maxAllowableOffset: '0.0005',
+        });
+        try {
+          const data = await readData(url, 'json', 4000);
+          for (const feature of asArray(data?.features)) {
+            if (!['Polygon', 'MultiPolygon'].includes(feature?.geometry?.type)) continue;
+            const county = normalizedArea(feature.properties?.CITYNAME2 ?? feature.properties?.CITYNAME);
+            if (targets.includes(county)) {
+              countyFeatures.set(county, feature);
+            }
+          }
+        } catch {
+          // A missing boundary does not prevent showing the official warning text.
+        }
+      }
+
+      function xmlChildren(node, name) {
+        return Array.from(node?.children ?? []).filter(child => child.localName.toLowerCase() === name);
+      }
+
+      function xmlText(node, name) {
+        return xmlChildren(node, name)[0]?.textContent.trim() ?? '';
+      }
+
+      function capFeature(area, name) {
+        const polygons = [];
+        for (const polygon of xmlChildren(area, 'polygon')) {
+          const points = polygon.textContent.trim().split(/\s+/).map(pair => {
+            const [lat, lng] = pair.split(',').map(Number);
+            return [lng, lat];
+          });
+          if (points.length < 3 || points.some(([lng, lat]) => !Number.isFinite(lng)
+            || !Number.isFinite(lat) || Math.abs(lng) > 180 || Math.abs(lat) > 90)) continue;
+          const first = points[0];
+          const last = points.at(-1);
+          if (first[0] !== last[0] || first[1] !== last[1]) points.push(first);
+          if (points.length >= 4) polygons.push([points]);
+        }
+        if (!polygons.length) return null;
+        const geometry = polygons.length === 1 ? { type: 'Polygon', coordinates: polygons[0] }
+          : { type: 'MultiPolygon', coordinates: polygons };
+        return { type: 'Feature', geometry, properties: { name } };
+      }
+
+      async function loadDistrictFeatures(alerts) {
+        const codes = [...new Set(alerts.filter(item => item.code && !item.feature)
+          .map(item => item.code).filter(code => !districtFeatures.has(code)))];
+        if (!codes.length) return;
+        const requests = [];
+        for (let index = 0; index < codes.length; index += 80) {
+          const values = codes.slice(index, index + 80).map(code => `'${code}'`).join(',');
+          const url = new URL(districtBoundaryFeed);
+          url.search = new URLSearchParams({
+            f: 'geojson', where: `nTown IN (${values})`,
+            outFields: 'nTown,CITYNAME,TOWNNAME,COMPNAME2', outSR: '4326', maxAllowableOffset: '0.0005',
+          });
+          requests.push(readData(url, 'json', 4000));
+        }
+        for (const result of await Promise.allSettled(requests)) {
+          if (result.status !== 'fulfilled') continue;
+          for (const feature of asArray(result.value?.features)) {
+            const code = String(feature?.properties?.nTown ?? '');
+            if (codes.includes(code) && ['Polygon', 'MultiPolygon'].includes(feature.geometry?.type)) {
+              districtFeatures.set(code, feature);
+            }
+          }
+        }
+      }
+
+      function districtAlerts(raw, counties, now) {
+        const doc = new DOMParser().parseFromString(raw, 'application/xml');
+        const root = doc.documentElement;
+        if (root?.localName !== 'alert' || xmlText(root, 'status') !== 'Actual'
+          || xmlText(root, 'scope') !== 'Public' || !['Alert', 'Update'].includes(xmlText(root, 'msgtype'))) return [];
+        const sent = timeValue(xmlText(root, 'sent'));
+        if (!Number.isFinite(sent) || now - sent > dataLifetime || sent - now > 10 * 60 * 1000) return [];
+
+        const areas = new Map();
+        for (const info of xmlChildren(root, 'info')) {
+          const language = xmlText(info, 'language');
+          const name = xmlText(info, 'headline');
+          if ((language && !language.toLowerCase().startsWith('zh')) || !rainPhenomenon.test(name) || /解除/.test(name)) continue;
+          const from = timeValue(xmlText(info, 'effective') || xmlText(info, 'onset') || xmlText(root, 'sent'));
+          const to = timeValue(xmlText(info, 'expires'));
+          if (!Number.isFinite(from) || !Number.isFinite(to) || now < from || now >= to) continue;
+          for (const region of xmlChildren(info, 'area')) {
+            const area = normalizedArea(xmlText(region, 'areadesc'));
+            const county = counties.find(item => area.startsWith(item));
+            const feature = capFeature(region, area);
+            if (!county || (area === county && !feature)) continue;
+            const geocode = xmlChildren(region, 'geocode').find(item => /^Taiwan_Geocode_(103|113)$/.test(xmlText(item, 'valuename')));
+            const value = xmlText(geocode, 'value');
+            const id = `${xmlText(root, 'identifier')}/${area}/${from}`;
+            areas.set(id, {
+              id, name, area, county, coverage: 'district', feature,
+              description: xmlText(info, 'description'),
+              from: new Date(from).toISOString(), to: new Date(to).toISOString(),
+              code: /^\d{7}$/.test(value) ? value : null,
+            });
+          }
+        }
+        return [...areas.values()];
+      }
+
+      async function loadDistrictAlerts(alerts, now) {
+        const counties = [...new Set(alerts.filter(alert => !alert.explicitlyWhole).map(alert => alert.county))];
+        if (!counties.length) return [];
+        let details;
+        try {
+          const raw = await readData(districtWarningFeed, 'text', 4000);
+          details = districtAlerts(raw, counties, now);
+        } catch {
+          return [];
+        }
+        await loadDistrictFeatures(details);
+        return details.map(({ code, ...alert }) => {
+          if (alert.feature) return { ...alert, geometrySource: '中央氣象署豪大雨特報 CAP' };
+          const boundary = districtFeatures.get(code);
+          const properties = boundary?.properties;
+          const verifiedName = [properties?.COMPNAME2, `${properties?.CITYNAME ?? ''}${properties?.TOWNNAME ?? ''}`]
+            .some(value => normalizedArea(value) === alert.area);
+          return {
+            ...alert, feature: verifiedName ? boundary : null,
+            geometrySource: verifiedName ? '國家災害防救科技中心鄉鎮市區界線' : null,
+          };
+        });
+      }
+
+      async function fetchSnapshot() {
+        let data;
+        try {
+          data = await readData(warningFeed);
+        } catch {
+          throw new Error('暫時無法取得中央氣象署警特報，請稍後重試。');
+        }
+        const now = Date.now();
+        const { issuedAt, alerts } = countyAlerts(data, now);
+        const [districts] = await Promise.all([loadDistrictAlerts(alerts, now), loadCountyFeatures(alerts)]);
+        return {
+          source: districts.length ? `${source}、W-C0033-003` : source,
+          issuedAt, checkedAt: new Date(now).toISOString(),
+          coverage: districts.length ? 'district' : 'county',
+          alerts: [
+            ...districts,
+            ...alerts.map(({ explicitlyWhole, ...alert }) => {
+              const feature = explicitlyWhole ? countyFeatures.get(alert.county) ?? null : null;
+              return {
+                ...alert, feature,
+                geometrySource: feature ? '國家災害防救科技中心縣市界線' : null,
+              };
+            }),
+          ].map(alert => ({
+            ...alert,
+            // County boundaries can narrow the text context, but do not delineate a partial warning.
+            referenceFeature: alert.feature ? null : countyFeatures.get(alert.county) ?? null,
+          })),
+        };
+      }
+
+      async function load({ force = false } = {}) {
+        const now = Date.now();
+        if (force || !cachedSnapshot || now - timeValue(cachedSnapshot.checkedAt) >= refreshInterval) {
+          if (!pending) {
+            pending = fetchSnapshot().then(snapshot => {
+              cachedSnapshot = snapshot;
+            }).catch(error => {
+              cachedSnapshot = null;
+              throw error;
+            }).finally(() => {
+              pending = null;
+            });
+          }
+          await pending;
+        }
+        return {
+          ...cachedSnapshot,
+          alerts: cachedSnapshot.alerts.filter(alert => timeValue(alert.to) > Date.now()),
+        };
+      }
+
+      return { load };
+    })();
+    const liveRouteOverlays = (() => {
+      const types = ['traffic', 'camera', 'rain'];
+      const titles = { traffic: '即時路況', camera: 'CCTV', rain: '雨天警示' };
+      const updateTime = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+      const dateText = value => Number.isFinite(new Date(value).getTime()) && value ? updateTime.format(new Date(value)) : '時間未提供';
+      const levels = { 1: ['順暢', '#22905f'], 2: ['車流較多', '#bd800b'], 3: ['壅塞', '#da6817'], 4: ['嚴重壅塞', '#bc3340'], 5: ['極度壅塞', '#892044'] };
+      const scaleLat = 111320;
+      const scaleLng = 102000;
+      const cellSize = 750;
+      const cameraRange = 600;
+      const maxCameras = 12;
+      const layers = {};
+      const display = {};
+      const data = {};
+      let map;
+      let currentPath;
+      let corridor;
+      let cameraLoad;
+      let generation = 0;
+
+      const interpolate = (from, to, ratio) => [from[0] + (to[0] - from[0]) * ratio, from[1] + (to[1] - from[1]) * ratio];
+      const project = ([lat, lng]) => [(lng - 121) * scaleLng, (lat - 24) * scaleLat];
+
+      function routeIndex(path) {
+        const points = path.map(project);
+        const cells = new Map();
+        const samples = [path[0]];
+        const bounds = points.reduce((box, [x, y]) => ({
+          left: Math.min(box.left, x), right: Math.max(box.right, x), bottom: Math.min(box.bottom, y), top: Math.max(box.top, y),
+        }), { left: Infinity, right: -Infinity, bottom: Infinity, top: -Infinity });
+        let progress = 0;
+        for (let i = 1; i < points.length; i++) {
+          const [x, y] = points[i - 1];
+          const [endX, endY] = points[i];
+          const dx = endX - x;
+          const dy = endY - y;
+          const length = Math.hypot(dx, dy);
+          if (!length) continue;
+          const segment = { x, y, dx, dy, length, progress };
+          const steps = Math.ceil(length / 250);
+          for (let step = 1; step <= steps; step++) samples.push(interpolate(path[i - 1], path[i], step / steps));
+          const left = Math.floor(Math.min(x, endX) / cellSize);
+          const right = Math.floor(Math.max(x, endX) / cellSize);
+          const bottom = Math.floor(Math.min(y, endY) / cellSize);
+          const top = Math.floor(Math.max(y, endY) / cellSize);
+          for (let a = left; a <= right; a++) for (let b = bottom; b <= top; b++) {
+            const key = `${a},${b}`;
+            if (!cells.has(key)) cells.set(key, []);
+            cells.get(key).push(segment);
+          }
+          progress += length;
+        }
+        return { cells, samples, bounds };
+      }
+
+      function nearest(point, maxDistance, heading) {
+        const [x, y] = project(point);
+        const { left, right, bottom, top } = corridor.bounds;
+        if (x < left - maxDistance || x > right + maxDistance || y < bottom - maxDistance || y > top + maxDistance) return null;
+        const xCell = Math.floor(x / cellSize);
+        const yCell = Math.floor(y / cellSize);
+        let best;
+        for (let a = xCell - 1; a <= xCell + 1; a++) for (let b = yCell - 1; b <= yCell + 1; b++) {
+          const segments = corridor.cells.get(`${a},${b}`);
+          if (!segments) continue;
+          for (const segment of segments) {
+            const { dx, dy, length } = segment;
+            if (heading && (heading[0] * dx + heading[1] * dy) / length < .72) continue;
+            const ratio = Math.max(0, Math.min(1, ((x - segment.x) * dx + (y - segment.y) * dy) / (length * length)));
+            const distance = Math.hypot(x - segment.x - ratio * dx, y - segment.y - ratio * dy);
+            if (distance <= maxDistance && (!best || distance < best.distance)) best = { distance, progress: segment.progress + ratio * length };
+          }
+        }
+        return best;
+      }
+
+      function matchingLines(paths) {
+        const lines = [];
+        for (const path of paths) {
+          let group = [];
+          let matchedDistance = 0;
+          function finish() {
+            if (matchedDistance >= 80) lines.push(group);
+            group = [];
+            matchedDistance = 0;
+          }
+          for (let i = 1; i < path.length; i++) {
+            const start = path[i - 1];
+            const end = path[i];
+            const dx = (end[1] - start[1]) * scaleLng;
+            const dy = (end[0] - start[0]) * scaleLat;
+            const length = Math.hypot(dx, dy);
+            if (!length) continue;
+            const steps = Math.ceil(length / 110);
+            const heading = [dx / length, dy / length];
+            for (let step = 0; step < steps; step++) {
+              const center = interpolate(start, end, (step + .5) / steps);
+              if (!nearest(center, 48, heading)) { finish(); continue; }
+              if (!group.length) group.push(interpolate(start, end, step / steps));
+              group.push(interpolate(start, end, (step + 1) / steps));
+              matchedDistance += length / steps;
+            }
+          }
+          finish();
+        }
+        return lines;
+      }
+
+      function ringContains(ring, x, y) {
+        let inside = false;
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+          const [aX, aY] = ring[i];
+          const [bX, bY] = ring[j];
+          if ((aY > y) !== (bY > y) && x < (bX - aX) * (y - aY) / (bY - aY) + aX) inside = !inside;
+        }
+        return inside;
+      }
+
+      function meetsArea(feature) {
+        const geometry = feature?.geometry;
+        if (!geometry) return false;
+        const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.type === 'MultiPolygon' ? geometry.coordinates : [];
+        return polygons.some(polygon => {
+          const [outer, ...holes] = polygon;
+          if (!outer?.length) return false;
+          let west = Infinity, south = Infinity, east = -Infinity, north = -Infinity;
+          for (const [lng, lat] of outer) {
+            west = Math.min(west, lng); east = Math.max(east, lng);
+            south = Math.min(south, lat); north = Math.max(north, lat);
+          }
+          return corridor.samples.some(([lat, lng]) => lng >= west && lng <= east && lat >= south && lat <= north
+            && ringContains(outer, lng, lat) && !holes.some(ring => ringContains(ring, lng, lat)));
+        });
+      }
+
+      function element(tag, text) {
+        const node = document.createElement(tag);
+        if (text) node.textContent = text;
+        return node;
+      }
+
+      function popup(title, details) {
+        const box = element('div');
+        box.className = 'route-data-popup';
+        box.append(element('strong', title), ...details.filter(Boolean).map(value => element('p', value)));
+        return box;
+      }
+
+      function cameraPoints(catalog) {
+        const matches = [];
+        for (const [source, id, name, lat, lng, prefix, suffix] of catalog.cameras) {
+          const distance = nearest([lat, lng], cameraRange);
+          if (!distance) continue;
+          const url = new URL(catalog.streamPrefixes[prefix] + suffix);
+          if (url.protocol !== 'https:' || !url.hostname.endsWith('.gov.tw')) continue;
+          matches.push({ id, name, lat, lng, url: url.href, source: catalog.sources[source], ...distance });
+        }
+        matches.sort((a, b) => a.distance - b.distance);
+        return { matches: matches.slice(0, maxCameras).sort((a, b) => a.progress - b.progress), total: matches.length };
+      }
+
+      function loadCameras() {
+        if (!cameraLoad) cameraLoad = fetch('./route-cameras.json', { signal: AbortSignal.timeout(12000) })
+          .then(response => {
+            if (!response.ok) throw new Error('無法載入官方 CCTV 點位名錄。');
+            return response.json();
+          }).catch(error => { cameraLoad = undefined; throw error; });
+        return cameraLoad;
+      }
+
+      function listRows(kind, rows) {
+        const list = $(`route-${kind}-list`);
+        list.replaceChildren(...rows);
+        list.hidden = rows.length === 0;
+      }
+
+      function setInfo(kind, summary, detail) {
+        $(`route-${kind}-status`).textContent = `${titles[kind]} · ${summary}`;
+        $(`route-${kind}-info`).textContent = detail;
+      }
+
+      function trafficResult(feed) {
+        const segments = [];
+        for (const group of feed.feeds) for (const section of group.sections) {
+          const level = levels[section.level];
+          if (!level) continue;
+          const paths = matchingLines(section.paths);
+          if (paths.length) segments.push({ ...section, paths, level, source: group.source });
+        }
+        const missing = feed.errors?.map(issue => issue.key === 'freeway' ? '國道' : '省道').join('、');
+        if (!feed.feeds.length) setInfo('traffic', '資料暫時無法查詢', feed.errors[0]?.message || '資料來源未回傳有效路況。可稍後更新或查看交通部 TDX。');
+        else if (!feed.feeds.some(group => group.sections.some(section => section.level))) setInfo('traffic', '資料時間或狀態未確認', '來源目前沒有有效觀測，稍後可更新查詢。');
+        else if (!segments.length) setInfo('traffic', '沿途未有資料', `已查詢國道、省道公開回報。${missing ? `${missing}來源目前無法查詢。` : '此路線尚無可比對的方向路段。'}`);
+        else {
+          const newest = segments.reduce((best, section) => Math.max(best, Date.parse(section.observedAt) || 0), 0);
+          setInfo('traffic', `${segments.length} 路段`, `最新量測 ${dateText(newest)}。${missing ? `${missing}來源未提供可用資料。` : '尚無觀測的路段以藍線表示。'}`);
+        }
+        return segments;
+      }
+
+      function rainResult(feed) {
+        const now = Date.now();
+        const preferred = feed.alerts.filter(alert => Date.parse(alert.from) <= now && Date.parse(alert.to) > now);
+        const confirmed = preferred.filter(alert => meetsArea(alert.feature));
+        const nearby = preferred.filter(alert => !alert.feature && meetsArea(alert.referenceFeature));
+        const unknown = preferred.filter(alert => !alert.feature && !alert.referenceFeature);
+        const summary = confirmed.length ? `${confirmed.length} 則範圍交會` : nearby.length ? '沿途縣市有特報' : unknown.length ? '有特報待比對' : '查無沿途有效特報';
+        setInfo('rain', summary, `中央氣象署豪大雨特報，來源時間 ${dateText(feed.issuedAt)}。${nearby.length ? '另有特報僅部分地區適用，請確認官方影響範圍。' : unknown.length ? '部分特報缺少可比對的區域邊界。' : ''}`);
+        listRows('rain', [...confirmed, ...nearby, ...unknown].map(alert => element('li', `${alert.name}｜${alert.area}（至 ${dateText(alert.to)}）${alert.feature ? '' : ' · 細部範圍請見公告'}`)));
+        return confirmed;
+      }
+
+      function cameraResult(catalog) {
+        const { matches, total } = cameraPoints(catalog);
+        setInfo('camera', total ? `沿途附近 ${total} 部` : '沿途附近無點位', `顯示距路線 ${cameraRange} 公尺內${total > maxCameras ? `最近的 ${maxCameras} 部` : '的攝影機'}。點「影」開啟官方串流。`);
+        return matches;
+      }
+
+      function cameraMarker(camera, layer) {
+        let img;
+        const marker = L.marker([camera.lat, camera.lng], {
+          title: camera.name, alt: camera.name,
+          icon: L.divIcon({ className: 'route-camera-pin', html: '影', iconSize: [23, 23] }),
+        }).addTo(layer).bindPopup(() => {
+          const box = popup(camera.name, [`${camera.source.name} · 距路線約 ${Math.round(camera.distance)} 公尺`]);
+          const image = element('img');
+          img = image;
+          image.alt = `${camera.name} 即時影像`;
+          const fallback = element('p');
+          fallback.setAttribute('role', 'status');
+          image.addEventListener('error', () => { fallback.textContent = '這支攝影機暫時無法載入。'; image.hidden = true; });
+          image.src = camera.url;
+          const direct = element('a', '開啟官方串流');
+          direct.href = camera.url;
+          direct.target = '_blank';
+          direct.rel = 'noopener noreferrer';
+          box.append(image, fallback, direct);
+          return box;
+        });
+        marker.on('popupclose remove', () => img?.removeAttribute('src'));
+        return marker;
+      }
+
+      function draw(kind) {
+        const layer = layers[kind];
+        if (!layer) return;
+        layer.clearLayers();
+        const items = display[kind] || [];
+        const toggle = $(`map-${kind}-layer`);
+        if (kind === 'camera') {
+          const rows = items.map(camera => {
+            const marker = cameraMarker(camera, layer);
+            const button = element('button', camera.name);
+            button.className = 'link-btn';
+            button.type = 'button';
+            button.addEventListener('click', () => {
+              if (!map.hasLayer(layer)) { toggle.checked = true; layer.addTo(map); }
+              map.panInside(marker.getLatLng(), { padding: [42, 42] });
+              marker.openPopup();
+            });
+            const item = element('li');
+            item.append(button);
+            return item;
+          });
+          listRows(kind, rows);
+        } else if (kind === 'traffic') {
+          for (const item of items) {
+            const [label, color] = item.level;
+            const speed = Number.isFinite(item.speed) && item.speed >= 0 ? `時速 ${Math.round(item.speed)} 公里` : '';
+            L.polyline(item.paths, { pane: 'routeLiveTraffic', color, weight: 6, opacity: .95 }).addTo(layer)
+              .bindPopup(() => popup(item.name, [`${label}${speed ? ` · ${speed}` : ''}`, `${item.source} · ${dateText(item.observedAt)}`]));
+          }
+        } else {
+          for (const item of items) {
+            L.geoJSON(item.feature, { pane: 'routeRainWarnings', style: { color: '#b76310', fillColor: '#f7a521', fillOpacity: .19, weight: 2, dashArray: '6 5' } }).addTo(layer)
+              .bindPopup(() => popup(item.name, [item.area, `有效至 ${dateText(item.to)}`, item.description]));
+          }
+        }
+        if (toggle.checked && !map.hasLayer(layer)) layer.addTo(map);
+        else if (!toggle.checked && map.hasLayer(layer)) layer.remove();
+      }
+
+      const sources = {
+        traffic: [() => liveTraffic.load(), trafficResult],
+        camera: [loadCameras, cameraResult],
+        rain: [() => liveRain.load(), rainResult],
+      };
+
+      async function refresh() {
+        if (!corridor) return;
+        const now = ++generation;
+        $('route-layer-refresh').disabled = true;
+        await Promise.allSettled(types.map(async kind => {
+          setInfo(kind, '查詢中…', '正在比對目前路線。');
+          const [fetchFeed, match] = sources[kind];
+          try {
+            const result = await fetchFeed();
+            if (now !== generation) return;
+            data[kind] = result;
+            display[kind] = match(result);
+          } catch (error) {
+            if (now !== generation) return;
+            delete data[kind];
+            display[kind] = [];
+            setInfo(kind, '暫時無法確認', error.message || '資料暫時無法取得。');
+            if (kind === 'rain') listRows(kind, []);
+          }
+          draw(kind);
+        }));
+        if (now === generation) $('route-layer-refresh').disabled = false;
+      }
+
+      function select(path) {
+        if (currentPath === path) return;
+        currentPath = path;
+        corridor = path ? routeIndex(path) : null;
+        $('route-layer-toolbar').hidden = !path;
+        $('route-feed-summary').hidden = !path;
+        ++generation;
+        for (const kind of types) {
+          display[kind] = [];
+          draw(kind);
+        }
+        listRows('rain', []);
+        if (path) refresh();
+      }
+
+      $('route-layer-refresh').addEventListener('click', refresh);
+      for (const kind of types) $(`map-${kind}-layer`).addEventListener('change', () => draw(kind));
+
+      function attach(instance) {
+        map = instance;
+        map.createPane('routeRainWarnings').style.zIndex = '390';
+        map.createPane('routeLiveTraffic').style.zIndex = '410';
+        for (const kind of types) layers[kind] = L.layerGroup();
+        for (const kind of types) draw(kind);
+      }
+
+      function redraw() {
+        if (corridor && data.rain) {
+          display.rain = rainResult(data.rain);
+          draw('rain');
+        }
+      }
+
+      return { select, attach, redraw };
+    })();
     (() => {
       const fields = [];
       let nextField = 0;
@@ -1498,6 +2346,7 @@
         setStatus(formStatus);
         setStatus(routeNote);
         routes = [];
+        liveRouteOverlays.select(null);
         destinations = fields.map(field => field.selection).filter(Boolean);
         chosen = 0;
         options.replaceChildren();
@@ -1543,6 +2392,7 @@
           tiles.on('tileerror', () => setStatus(mapStatus, '部分底圖暫時載入失敗，仍可查看路線與車程。', true));
           tiles.on('loading', () => setStatus(mapStatus));
           mapLayers = L.layerGroup().addTo(map);
+          liveRouteOverlays.attach(map);
           setStatus(mapStatus);
           if (!$('live-map-mode').hidden) map.invalidateSize();
           drawLiveTrip();
@@ -1622,6 +2472,7 @@
         }));
         legList.hidden = false;
         drawLiveTrip();
+        liveRouteOverlays.select(selected.path);
       }
 
       async function planLiveTrip(event) {
@@ -1668,11 +2519,11 @@
         $('go-classroom').setAttribute('aria-pressed', String(classroom));
         $('go-live-trip').setAttribute('aria-pressed', String(!classroom));
         $('trip-source-link').href = classroom ? '#sources' : '#live-sources';
-        $('trip-intro').textContent = classroom ? '規劃出遊行程，一起看路況、CCTV 與雨天警示。' : '搜尋地點、安排停靠點，在地圖上查看實際道路路線。';
+        $('trip-intro').textContent = classroom ? '課堂情境使用模擬資料展示避塞和雨天備案。' : '規劃路線後，在地圖上查看沿途路況、CCTV 與雨天警示。';
         if (classroom) requestAnimationFrame(renderMap);
         else {
           openLiveMap();
-          requestAnimationFrame(drawLiveTrip);
+          requestAnimationFrame(() => { drawLiveTrip(); liveRouteOverlays.redraw(); });
         }
       }
 
